@@ -10,7 +10,6 @@ SCENARIO("getting confident with the addresses"){
   REQUIRE( l == 0);
   l = pool.push_front(42,l);
   REQUIRE( l == 1);
-  
 
 }
 
