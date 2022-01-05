@@ -5,35 +5,35 @@
 #include <vector>
 
 
-template <typename node, typename T,typename N>
+template <typename node,typename N>
 class _iterator {
   std::vector<node>* Pool;
-  T current;
+  node current;
  public:
   using value_type = N;
   using reference = value_type&;
   using pointer = value_type*;
-  using iterator_category =  std::random_access_iterator_tag;
+  using iterator_category = std::bidirectional_iterator_tag;
 
-  explicit _iterator(std::vector<node>* p,T x):Pool{p},current{x}{}
+  explicit _iterator(std::vector<node>* p,node x):Pool{p},current{x}{}
 
-  value_type operator*() const { return (*Pool)[current-1].value; }
+  value_type operator*() const noexcept{ return current.value; }
 
-  _iterator& operator++() {  // pre-increment
-    current=(*Pool)[current-1].next;
+  _iterator& operator++()noexcept {  // pre-increment
+    current=(*Pool)[current.next-1];
     return *this;
   }
-  _iterator operator++(int) {  // post-increment
+  _iterator operator++(int)noexcept {  // post-increment
     auto tmp = *this;
     ++(*this);
     return tmp;
   }
 
-  friend bool operator==(const _iterator& x, const _iterator& y) {
-    return (x.current == y.current);// && x.current.value == y.current.value);
+  friend bool operator==(const _iterator& x, const _iterator& y)noexcept {
+      return (x.current.next==y.current.next);
   }
 
-  friend bool operator!=(const _iterator& x, const _iterator& y) {
+  friend bool operator!=(const _iterator& x, const _iterator& y)noexcept {
     return !(x == y);
   }
 };
@@ -60,28 +60,36 @@ class list_pool{
 
     public:
 
-    list_pool()=default;
+    list_pool() noexcept =default;
 
-    explicit list_pool(size_type n){
-        std::cout<<"Constructor "<<std::endl;
-        pool.reserve(n);
+    explicit list_pool(list_type n):pool(n){}
+
+    void reserve(list_type n){
+        std::vector<node_t> tmp(n);
+        pool=tmp;
+    }
+
+    void resize(list_type n){
+        std::vector<node_t> tmp(n);
+        std::move(pool.begin(),pool.end(),tmp.begin());
+        pool=tmp;
+    }
+
+    //move constructor
+    list_pool(list_pool&& source) noexcept :pool{std::move(source.pool)}{
+        std::cout<<"Move constructor "<<std::endl;
+    }
+
+    //move assignment
+    list_pool& operator=(list_pool&& source)noexcept{
+        std::cout<<"Move assignment... "<<std::endl;
+        pool=std::move(source.pool);
+        return *this;
     }
 
     // copy constructor 
     list_pool(const list_pool& source):pool{source.pool}{
         std::cout<<"Copy constructor "<<std::endl;
-    }
-
-    //move constructor
-    list_pool(list_pool&& source):pool{std::move(source.pool)}{
-        std::cout<<"Move constructor "<<std::endl;
-    }
-
-    //move assignment
-    list_pool& operator=(list_pool&& source){
-        std::cout<<"Move assignment... "<<std::endl;
-        pool=std::move(source.pool);
-        return *this;
     }
 
     // copy assignment 
@@ -94,7 +102,7 @@ class list_pool{
     }
 
     list_type _push_front(T&& val, list_type head){
-        check_capacity(count);
+        check_capacity(count,capacity());
         if(free_node_list!=0){
             register list_type tmp{free_node_list};
             free_node_list=next(free_node_list);
@@ -126,7 +134,7 @@ class list_pool{
     }
 
     list_type _push_back(T&& val, list_type head){
-        check_capacity(count);
+        check_capacity(count,capacity());
         register list_type tmp{head};
         if(head==0){ //new list is insert
             ++count;
@@ -153,76 +161,64 @@ class list_pool{
     }
 
 
-    void check_capacity(size_type x) {
-        // register N tmp{vec.capacity()};
-        if (x < capacity()){
-        // std::cout<<"Nothing to do"<<std::endl;
-        return;
+    void check_capacity(size_type x, size_type c){
+        if (x < c){
+            return;
         }else if(x==0){
             reserve(8);
-        // std::cout<<"reserved 8 positions"<<std::endl;
         }else{
-        // std::cout<<"reserved "<<capacity() * 2<<std::endl;
-        reserve(capacity() * 2);
+            resize(c * 2);
         }
     }
 
-    void reserve(size_type n){
-        pool.resize(n);
+    size_type capacity() const noexcept{
+        return pool.capacity();
     }
 
-    void set_element(T val, N idx){
-        pool[idx]=val;
-    }
-
-    size_type capacity() const{
-        return pool.size();
-    }
-
-    T& value(list_type x){
+    T& value(list_type x)noexcept{
         return node(x).value;
     }
 
-    const T& value(list_type x)const{
+    const T& value(list_type x)const noexcept{
         return node(x).value;
     }
 
-    list_type& next(list_type x){
+    list_type& next(list_type x)noexcept{
         return node(x).next;
     }
 
-    const list_type& next(list_type x) const{
+    const list_type& next(list_type x) const noexcept{
         return node(x).next;
     }
 
     list_type end() const noexcept { return 0; }
 
-    list_type new_list(){ return end(); }
+    list_type new_list()noexcept{ return end(); }
 
-    bool is_empty(list_type x) const{
+    bool is_empty(list_type x) const noexcept{
       return x==end();
     }
     
-    using iterator = _iterator<node_t,T,N>;
-    using const_iterator = _iterator<node_t,T,N>;
+    using iterator = _iterator<node_t,N>;
+    using const_iterator = _iterator<node_t,N>;
 
-    iterator begin(list_type x){
-        return iterator(&pool,x);
+    iterator begin(list_type x)noexcept{
+        return iterator(&pool,node(x));
     }
-    iterator end(list_type ){ // this is not a typo
-        return iterator(&pool,end());
+    iterator end(list_type )noexcept{ // this is not a typo
+        return iterator(&pool,node(end()));
     } 
-    const_iterator begin(list_type x) const{
-        return iterator(&pool,x);
+    const_iterator begin(list_type x) const noexcept{
+        return iterator(&pool,node(x));
     }
-    const_iterator end(list_type ) const{
-        return iterator(&pool,end());
+    const_iterator end(list_type ) const noexcept{
+        return iterator(&pool,node(end()));
     } 
-    const_iterator cbegin(list_type x) const{
-        return iterator(&pool,x);
+    const_iterator cbegin(list_type x) const noexcept{
+        return iterator(&pool,node(x));
     }
-    const_iterator cend(list_type ) const{
-        return iterator(&pool,end());
+    const_iterator cend(list_type ) const noexcept{
+        return iterator(&pool,node(end()));
     }
 
     list_type free(list_type x) // delete first node
