@@ -13,7 +13,7 @@ class _iterator {
   using value_type = N;
   using reference = value_type&;
   using pointer = value_type*;
-  using iterator_category = std::bidirectional_iterator_tag;
+  using iterator_category = std::forward_iterator_tag;
 
   explicit _iterator(std::vector<node>* p,node x):Pool{p},current{x}{}
 
@@ -65,14 +65,14 @@ class list_pool{
     explicit list_pool(list_type n):pool(n){}
 
     void reserve(list_type n){
-        std::vector<node_t> tmp(n);
-        pool=tmp;
+        std::vector<node_t> pool(n);
+        // pool=std::move(tmp);
     }
 
     void resize(list_type n){
         std::vector<node_t> tmp(n);
         std::move(pool.begin(),pool.end(),tmp.begin());
-        pool=tmp;
+        pool=std::move(tmp);
     }
 
     //move constructor
@@ -101,18 +101,17 @@ class list_pool{
         return *this;
     }
 
-    list_type _push_front(T&& val, list_type head){
-        check_capacity(count,capacity());
+    template<typename X>
+    list_type _push_front(X&& val, list_type head){
+        node_t new_node={std::forward<X>(val),head};
         if(free_node_list!=0){
             register list_type tmp{free_node_list};
             free_node_list=next(free_node_list);
-            value(tmp)=std::forward<T>(val);     
-            next(tmp)=head;     
+            node(tmp)=std::move(new_node);
             return tmp;
         }else{
-            ++count;
-            value(count)=std::forward<T>(val);
-            next(count)=head;
+            if(count>=capacity()) resize((count+1)*2);
+            node(++count)=std::move(new_node);
             return count;
         }
     }
@@ -133,41 +132,29 @@ class list_pool{
         return _push_back(val,head);
     }
 
-    list_type _push_back(T&& val, list_type head){
-        check_capacity(count,capacity());
-        register list_type tmp{head};
+    template<typename X>
+    list_type _push_back(X&& val, list_type head){
+        node_t new_node={std::forward<X>(val),end()};
         if(head==0){ //new list is insert
-            ++count;
-            value(count)=val;
-            next(count)=end();
+            if(count>=capacity()) resize((count+1)*2);
+            node(++count)=std::move(new_node);
             return count;
         }
+        register list_type tmp{head};
         while(next(tmp)!=0){
             tmp=next(tmp);
         }
         if(free_node_list!=0){
             next(tmp)=free_node_list;
-            value(free_node_list)=std::forward<T>(val);
-            next(free_node_list)=end();
+            node(free_node_list)=std::move(new_node);
             free_node_list=next(free_node_list);
             return head;
         }else{
+            if(count>=capacity()) resize((count+1)*2);
             ++count;
             next(tmp)=count;
-            value(count)=std::forward<T>(val);
-            next(count)=end();
+            node(count)=std::move(new_node);
             return head;
-        }
-    }
-
-
-    void check_capacity(size_type x, size_type c){
-        if (x < c){
-            return;
-        }else if(x==0){
-            reserve(8);
-        }else{
-            resize(c * 2);
         }
     }
 
