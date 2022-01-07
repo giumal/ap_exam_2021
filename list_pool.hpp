@@ -53,7 +53,11 @@ class list_pool{
     using size_type = typename std::vector<node_t>::size_type;
 
     list_type free_node_list=end();
-    list_type count=0;
+    //  Variable used in the push mehods to know how many elements are stored in the array
+    //  Actually if the push_back is not used this variable can be deleted substituting it with head in the push_front
+    //  The push_back method is not very efficient, to do it in an efficint way maybe a "N previous" variable
+    //  should be inserted in the node_t structure. 
+    list_type count=0; 
 
     node_t& node(list_type x) noexcept { return pool[x-1]; }
     const node_t& node(list_type x) const noexcept { return pool[x-1]; }
@@ -65,8 +69,8 @@ class list_pool{
     explicit list_pool(list_type n):pool(n){}
 
     void reserve(list_type n){
-        std::vector<node_t> pool(n);
-        // pool=std::move(tmp);
+        std::vector<node_t> tmp(n);
+        pool=std::move(tmp);
     }
 
     void resize(list_type n){
@@ -101,18 +105,17 @@ class list_pool{
         return *this;
     }
 
-    template<typename X>
-    list_type _push_front(X&& val, list_type head){
-        node_t new_node={std::forward<X>(val),head};
-        if(free_node_list!=0){
+    list_type _push_front(value_type val, list_type head){
+        node_t new_node={val,head};
+        if(free_node_list==0){
+            if(++count>=capacity()) resize(count*8);
+            node(count)=std::move(new_node);
+            return count;
+        }else{
             register list_type tmp{free_node_list};
             free_node_list=next(free_node_list);
             node(tmp)=std::move(new_node);
             return tmp;
-        }else{
-            if(count>=capacity()) resize((count+1)*2);
-            node(++count)=std::move(new_node);
-            return count;
         }
     }
 
@@ -132,12 +135,16 @@ class list_pool{
         return _push_back(val,head);
     }
 
-    template<typename X>
-    list_type _push_back(X&& val, list_type head){
-        node_t new_node={std::forward<X>(val),end()};
+    list_type _push_back(value_type val, list_type head){
+        node_t new_node={val,end()};
         if(head==0){ //new list is insert
-            if(count>=capacity()) resize((count+1)*2);
-            node(++count)=std::move(new_node);
+            if(free_node_list!=0){
+                count=free_node_list;
+                free_node_list=next(free_node_list);
+            }else{
+                if(++count>=capacity()) resize(count*8);
+            }
+            node(count)=std::move(new_node);
             return count;
         }
         register list_type tmp{head};
@@ -150,11 +157,20 @@ class list_pool{
             free_node_list=next(free_node_list);
             return head;
         }else{
-            if(count>=capacity()) resize((count+1)*2);
-            ++count;
+            if(++count>=capacity()) resize(count*8);
             next(tmp)=count;
             node(count)=std::move(new_node);
             return head;
+        }
+    }
+
+
+    void print_list(const list_type& head){
+        list_type tmp=head;
+        while (tmp!=end())
+        {
+            std::cout<<"print  "<<value(tmp)<<" idx "<<tmp<<" next "<<next(tmp)<<" mem "<<&next(tmp)<<"\n";
+            tmp=next(tmp);
         }
     }
 
@@ -211,7 +227,6 @@ class list_pool{
     list_type free(list_type x) // delete first node
     {
         if(x==end())return x;
-
         auto tmp=next(x);
         next(x)=free_node_list;
         free_node_list=x;
